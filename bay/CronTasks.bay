@@ -1,0 +1,102 @@
+/*!
+ *  Bayrell Runtime Library
+ *
+ *  (c) Copyright 2016-2020 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+namespace Runtime.Cron;
+
+use Runtime.lib;
+use Runtime.Core.Entity;
+use Runtime.Cron.Cron;
+use Runtime.Task.CronTask;
+use Runtime.Task.CronTimer;
+use Runtime.Task.TaskDriver;
+use Runtime.Task.TaskList;
+use Runtime.Task.TaskMethod;
+
+
+@TaskList{}
+class CronTasks
+{
+	
+	
+	/**
+	 * Run cron
+	 */
+	@TaskMethod{ "alias": "run_cron" }
+	static async void run()
+	{
+		Collection<TaskMethod> tasks = await Cron::getCronTasks();
+		
+		for (int i=0; i<tasks.count(); i++)
+		{
+			TaskMethod task = tasks[i];
+			task = await static::runMethod(task);
+		};
+	}
+	
+	
+	
+	/**
+	 * Loop cron
+	 */
+	@TaskMethod{ "alias": "loop_cron" }
+	static async void loop()
+	{
+		TaskDriver output = @.getDriver(classof TaskDriver);
+		while (true)
+		{
+			output.writeln ("Loop cron");
+			await static::run();
+			await rtl::sleep(5000);
+		}
+	}
+	
+	
+	
+	/**
+	 * Run cron
+	 */
+	static async TaskMethod runMethod(TaskMethod task)
+	{
+		int current_time = rtl::time();
+		int next_run = task.nextRun();
+		
+		if (not (task instanceof CronTimer)) return task;
+		if (task.can_run == false) return task;
+		if (current_time < next_run) return task;
+		
+		task = await Cron::updateLastRun(task, current_time);
+		
+		try
+		{
+			TaskDriver output = @.getDriver(classof TaskDriver);
+			output.writeln ("Run task " ~ task.getCommand());
+			
+			/* Run method */
+			fn f = rtl::method(task.class_name, task.method_name);
+			await f();
+		}
+		catch (var e)
+		{
+			log(e);
+		}
+		
+		return task;
+	}
+	
+	
+}
