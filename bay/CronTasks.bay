@@ -19,7 +19,7 @@
 namespace Runtime.Cron;
 
 use Runtime.lib;
-use Runtime.Core.Entity;
+use Runtime.Entity;
 use Runtime.Cron.Cron;
 use Runtime.Task.CronTask;
 use Runtime.Task.CronTimer;
